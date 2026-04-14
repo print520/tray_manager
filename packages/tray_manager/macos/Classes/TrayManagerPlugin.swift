@@ -1,4 +1,5 @@
 import Cocoa
+import CryptoKit
 import FlutterMacOS
 
 let kEventOnTrayIconMouseDown = "onTrayIconMouseDown"
@@ -26,6 +27,10 @@ public class TrayManagerPlugin: NSObject, FlutterPlugin, NSMenuDelegate {
     
     var trayIcon: TrayIcon?
     var trayMenu: TrayMenu?
+    /// 与上次 setIcon 相同的像素内容则跳过，避免 NSStatusItem 每帧重绘（CPU 飙高）
+    private var lastIconContentSignature: String?
+    private var lastToolTip: String?
+    private var lastTitle: String?
     //    var statusItem: NSStatusItem = NSStatusItem();
     
     var _inited: Bool = false;
@@ -111,6 +116,9 @@ public class TrayManagerPlugin: NSObject, FlutterPlugin, NSMenuDelegate {
             trayIcon?.removeImage()
             trayIcon = nil
         }
+        lastIconContentSignature = nil
+        lastToolTip = nil
+        lastTitle = nil
         result(true)
     }
     
@@ -137,10 +145,24 @@ public class TrayManagerPlugin: NSObject, FlutterPlugin, NSMenuDelegate {
         let iconPosition: String =  args["iconPosition"] as! String;
         let iconSize: Int = args["iconSize"] as! Int;
         
-        let imageData = Data(base64Encoded: base64Icon, options: .ignoreUnknownCharacters)
-        let image = NSImage(data: imageData!)
-        image!.size = NSSize(width: iconSize, height: iconSize)
-        image!.isTemplate = isTemplate
+        guard let imageData = Data(base64Encoded: base64Icon, options: .ignoreUnknownCharacters) else {
+            result(FlutterError(code: "invalid_icon_data", message: "Failed to decode tray icon base64", details: nil))
+            return
+        }
+        let digest = SHA256.hash(data: imageData)
+        let hashHex = digest.map { String(format: "%02x", $0) }.joined()
+        let contentSignature = "\(hashHex)#\(isTemplate)#\(iconPosition)#\(iconSize)"
+        if lastIconContentSignature == contentSignature {
+            result(true)
+            return
+        }
+        
+        guard let image = NSImage(data: imageData) else {
+            result(FlutterError(code: "invalid_icon_data", message: "Failed to create NSImage from tray icon data", details: nil))
+            return
+        }
+        image.size = NSSize(width: iconSize, height: iconSize)
+        image.isTemplate = isTemplate
         
         if (trayIcon == nil) {
             trayIcon = TrayIcon()
@@ -158,7 +180,8 @@ public class TrayManagerPlugin: NSObject, FlutterPlugin, NSMenuDelegate {
             }
         }
         
-        trayIcon?.setImage(image!, iconPosition)
+        trayIcon?.setImage(image, iconPosition)
+        lastIconContentSignature = contentSignature
         
         result(true)
     }
@@ -175,8 +198,13 @@ public class TrayManagerPlugin: NSObject, FlutterPlugin, NSMenuDelegate {
     public func setToolTip(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         let args:[String: Any] = call.arguments as! [String: Any]
         let toolTip: String =  args["toolTip"] as! String;
+        if lastToolTip == toolTip {
+            result(true)
+            return
+        }
         
         trayIcon?.setToolTip(toolTip)
+        lastToolTip = toolTip
         
         result(true)
     }
@@ -184,8 +212,13 @@ public class TrayManagerPlugin: NSObject, FlutterPlugin, NSMenuDelegate {
     public func setTitle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         let args:[String: Any] = call.arguments as! [String: Any]
         let title: String =  args["title"] as! String;
+        if lastTitle == title {
+            result(true)
+            return
+        }
         
         trayIcon?.setTitle(title)
+        lastTitle = title
         
         result(true)
     }

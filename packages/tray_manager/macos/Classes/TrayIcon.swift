@@ -103,6 +103,13 @@ public class TrayIcon: NSView {
     }
     
     public func setImage(_ image: NSImage, _ imagePosition: String) {
+        if let cur = imageView.image,
+           let a = cur.tiffRepresentation,
+           let b = image.tiffRepresentation,
+           a == b,
+           imageView.isHidden == false {
+            return
+        }
         imageView.image = image
         imageView.isHidden = false
         if let button = statusItem?.button {
@@ -120,6 +127,9 @@ public class TrayIcon: NSView {
     }
     
     public func setTitle(_ title: String) {
+        if textField.stringValue == title && textField.isHidden == title.isEmpty {
+            return
+        }
         textField.attributedStringValue = NSAttributedString(string: title, attributes: textAttributes)
         textField.isHidden = title.isEmpty
         if let button = statusItem?.button {
