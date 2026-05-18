@@ -117,9 +117,9 @@ static FlMethodResponse* set_icon(TrayManagerPlugin* self, FlValue* args) {
   if (!indicator) {
     indicator = app_indicator_new(id, icon_path,
                                   APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
-    if (menu) {
-      app_indicator_set_menu(indicator, GTK_MENU(menu));
-    }
+
+    app_indicator_set_menu(indicator, GTK_MENU(menu));
+    gtk_widget_show_all(menu);
   }
 
   app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
@@ -130,10 +130,6 @@ static FlMethodResponse* set_icon(TrayManagerPlugin* self, FlValue* args) {
 }
 
 static FlMethodResponse* set_title(TrayManagerPlugin* self, FlValue* args) {
-  if (!indicator) {
-    return FL_METHOD_RESPONSE(
-        fl_method_success_response_new(fl_value_new_bool(true)));
-  }
   const char* title =
       fl_value_get_string(fl_value_lookup_string(args, "title"));
 
@@ -146,15 +142,9 @@ static FlMethodResponse* set_title(TrayManagerPlugin* self, FlValue* args) {
 static FlMethodResponse* set_context_menu(TrayManagerPlugin* self,
                                           FlValue* args) {
   menu = _create_menu(fl_value_lookup_string(args, "menu"));
-  gtk_widget_show_all(menu);
-
-  if (!indicator) {
-    // setIcon 尚未调用时仅缓存菜单，待 indicator 创建后再挂载
-    return FL_METHOD_RESPONSE(
-        fl_method_success_response_new(fl_value_new_bool(true)));
-  }
 
   app_indicator_set_menu(indicator, GTK_MENU(menu));
+  gtk_widget_show_all(menu);
 
   return FL_METHOD_RESPONSE(
       fl_method_success_response_new(fl_value_new_bool(true)));
